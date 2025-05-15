@@ -1,40 +1,43 @@
 locals {
-  # true if schedule_expression is set
-  schedule_expression_set = var.event_rule_schedule_expression != null && var.event_rule_schedule_expression != ""
-
-  # true if event_pattern is set
-  event_pattern_set = length(var.event_rule_event_pattern) > 0
+  eventbridge_rules = [
+    for rule in var.rules :
+    merge(rule, {
+      name = rule.name
+      Name = var.append_rule_postfix ? "${replace(rule.name, "_", "-")}-rule" : rule.name
+    })
+  ]
 }
 
 resource "aws_cloudwatch_event_rule" "this" {
-  name           = var.event_rule_name
-  description    = var.event_rule_description
-  event_bus_name = var.event_rule_event_bus_name
-  state          = var.event_rule_state
-  tags           = var.event_rule_tags
+  for_each = { for rule in local.eventbridge_rules : rule.name => rule }
 
-  # Out of these two are only one should be set
-  event_pattern       = local.event_pattern_set ? jsonencode(var.event_rule_event_pattern) : null
-  schedule_expression = local.schedule_expression_set ? var.event_rule_schedule_expression : null
+  name           = each.value.Name
+  description    = try(each.value.description, null)
+  event_bus_name = each.value.event_bus_name
+  state          = try(each.value.state, "ENABLED")
+  tags           = try(each.value.tags, {})
+
+  event_pattern       = try(length(each.value.event_pattern) > 0 ? jsonencode(each.value.event_pattern) : null, null)
+  schedule_expression = try(each.value.schedule_expression != "" ? each.value.schedule_expression : null, null)
 
   lifecycle {
-    # Fail if both are set
     precondition {
-      condition     = !(local.schedule_expression_set && local.event_pattern_set)
-      error_message = "Both event_pattern and schedule_expression cannot be set at once."
+      condition = !(
+        try(each.value.schedule_expression != null && each.value.schedule_expression != "", false)
+        &&
+        try(each.value.event_pattern != null && length(keys(each.value.event_pattern)) > 0, false)
+      )
+      error_message = "Cannot define both schedule_expression and event_pattern."
     }
 
-    # Fail if neither is set
     precondition {
-      condition     = local.schedule_expression_set || local.event_pattern_set
-      error_message = "At least one of event_pattern or schedule_expression must be set."
+      condition = (
+        try(each.value.schedule_expression != null && each.value.schedule_expression != "", false)
+        ||
+        try(each.value.event_pattern != null && length(keys(each.value.event_pattern)) > 0, false)
+      )
+      error_message = "Must define either schedule_expression or event_pattern."
     }
-
-    # if schedule_expression is choosen
-    # precondition {
-    #   condition     = !local.schedule_expression_set || local.event_bus_is_default
-    #   error_message = "Schedule Expression is supported only on the default event bus."
-    # }
-
   }
+
 }

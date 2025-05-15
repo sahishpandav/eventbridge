@@ -3,34 +3,29 @@ module "eb" {
   bus_name = "my-bus"
 }
 
-module "rule-event-pattern" {
-  source                    = "./modules/rules"
-  event_rule_name = "my-demo-rule"
-  event_rule_event_bus_name = module.eb.arn
-  event_rule_event_pattern = {
-    source = [
-      "aws.ec2", "aws.s3"
-    ]
-  }
-  # event_rule_schedule_expression = "rate(5 minutes)"
+module "rule_event_pattern" {
+  source = "./modules/rules"
 
-  depends_on = [ module.eb ]
+  rules = [
+    {
+      name                = "my-demo-rule"
+      description         = "Trigger for EC2 and S3 events"
+      event_bus_name      = module.eb.arn
+      event_pattern       = {
+        source = ["aws.ec2", "aws.s3"]
+      }
+      schedule_expression = null
+      state               = "ENABLED"
+      tags = {
+        Environment = "dev"
+      }
+    }
+  ]
+
+  append_rule_postfix = true
+
+  depends_on = [module.eb]
 }
-
-output "bus-arn" {
-  value = module.eb.arn
-}
-
-
-module "target" {
-  source          = "./modules/targets"
-  target_bus_name = module.eb.arn
-  target_rule     = module.rule-event-pattern.name
-  target_arn      = aws_sns_topic.topic.arn
-
-  depends_on = [aws_sns_topic.topic]
-}
-
 
 resource "aws_sns_topic" "topic" {
   name = "MyServerMonitor"
@@ -51,4 +46,22 @@ data "aws_iam_policy_document" "sns_topic_policy" {
     }
     resources = [aws_sns_topic.topic.arn]
   }
+}
+
+module "target" {
+  source          = "./modules/targets"
+
+  target_bus_name = module.eb.arn
+  target_rule     = module.rule_event_pattern.rule_names["my-demo-rule"]
+  target_arn      = aws_sns_topic.topic.arn
+
+  depends_on = [aws_sns_topic.topic]
+}
+
+output "bus-arn" {
+  value = module.eb.arn
+}
+
+output "rule_names" {
+  value = module.rule_event_pattern.rule_names
 }

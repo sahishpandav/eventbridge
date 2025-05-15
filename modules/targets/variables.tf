@@ -1,20 +1,14 @@
-# two arguments are required here
-# 1. arn - The Amazon Resource Name (ARN) of the target.
-# 2. rule - The name of the rule you want to add targets to.
-
-variable "target_arn" {
+variable "target_bus_name" {
+  description = "The name or ARN of the event bus"
   type        = string
-  description = "The Amazon Resource Name (ARN) of the target."
 }
 
 variable "target_rule" {
+  description = "The name of the event rule"
   type        = string
-  description = "The name of the rule you want to add targets to."
 }
 
-# these args are optional
-variable "target_bus_name" {
+variable "target_arn" {
+  description = "The ARN of the target resource (e.g., Lambda or SNS)"
   type        = string
-  description = "The name or ARN of the event bus to associate with the rule. If you omit this, the default event bus is used"
-  default     = "default"
 }

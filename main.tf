@@ -51,13 +51,25 @@ data "aws_iam_policy_document" "sns_topic_policy" {
 module "target" {
   source          = "./modules/targets"
 
-  target_bus_name = module.eb.arn
-  target_rule     = module.rule_event_pattern.rule_names["my-demo-rule"]
-  target_arn      = aws_sns_topic.topic.arn
+   targets = [
+    {
+      name           = "sns_target"
+      rule_name      = module.rule_event_pattern.rule_names["my-demo-rule"]
+      target_arn     = aws_sns_topic.topic.arn
+      event_bus_name = module.eb.arn # optional; omit if default bus
+    }
+  ]
 
-  depends_on = [aws_sns_topic.topic]
+  # target_bus_name = module.eb.arn
+  # target_rule     = module.rule_event_pattern.rule_names["my-demo-rule"]
+  # target_arn      = aws_sns_topic.topic.arn
+
+  # depends_on = [aws_sns_topic.topic]
 }
 
+output "targets"{
+  value = module.target.target_structure
+}
 output "bus-arn" {
   value = module.eb.arn
 }
